@@ -13,10 +13,17 @@ public class PlayGame : MonoBehaviour
     public static int StartScore = 0;
     public GameObject[] gamePieces;
     public GameObject[] playerHand;
+    
     public bool isWord = false;
+
+    public GameObject[] tripleLetter;
+    public GameObject[] tripleWord;
+    public bool isTripleWord = false;
 
     public GameObject wordDef;
     public GameObject wordPlayed;
+
+    public List<GameObject> PlayedPiecePos = new List<GameObject>();
     // Start is called before the first frame update
     void Start()
     {
@@ -29,7 +36,7 @@ public class PlayGame : MonoBehaviour
     // Update is called once per frame
     public void SubmitTurn()
     {
-        string[,] SetPieces = new string[15,15];
+        string[,] SetPieces = new string[16,16];
         PlayedPieces = GameObject.FindGameObjectsWithTag("Snapped");
         foreach (GameObject piece in PlayedPieces)
         {
@@ -121,47 +128,94 @@ public class PlayGame : MonoBehaviour
             else if((int)Mathf.Ceil(piece.transform.position.z) == -82){
                 y=11;
             }
-            else if((int)Mathf.Floor(piece.transform.position.z) == -102){
+            else if((int)Mathf.Ceil(piece.transform.position.z) == -102){
                 y=12;
             }
-            else if((int)Mathf.Floor(piece.transform.position.z) == -122){
+            else if((int)Mathf.Ceil(piece.transform.position.z) == -122){
                 y=13;
             }
-            else if((int)Mathf.Floor(piece.transform.position.z) == -142){
+            else if((int)Mathf.Ceil(piece.transform.position.z) == -142){
                 y=14;
             }
             if(x != -1 && y!= -1){
                 SetPieces[x,y] = piece.GetComponent<Text>().text.Substring(0,1);
+                // PlayedPiecePos.Add(piece);
             }
+
+            // check for triple word score
+            tripleWord = GameObject.FindGameObjectsWithTag("TripleWord");
+            foreach(var tw in tripleWord)
+            {
+                if(piece.transform.position == tw.transform.position)
+                {
+                    Debug.Log("triple word score");
+                    Debug.Log(tw);
+                    isTripleWord = true;
+                }
+            }
+
+            // check for triple letter score
+            tripleLetter = GameObject.FindGameObjectsWithTag("TripleLetter");
+            foreach(var tl in tripleLetter)
+            {
+                if(piece.transform.position == tl.transform.position)
+                {
+                    Debug.Log("triple letter score");
+                    Debug.Log(tl);
+                    var pieceValue = int.Parse(piece.GetComponent<Text>().text.Substring(1,1));
+                    TurnScore += pieceValue * 2;
+                } 
+            }
+
             TurnScore += int.Parse(piece.GetComponent<Text>().text.Substring(1,1));
         }
 
         List<string> AllWords= new List<string>();
-        Debug.Log(TurnScore);
+        // Debug.Log(TurnScore);
         string tempWord = "";
+        for (int j = 0; j<15; j++)
+        {
+            for(int k = 0; k<15; k++)
+            {
+                if(SetPieces[k,j] != null && !SetPieces[k,j].Equals(null))
+                {
+                    while(SetPieces[k,j] != null && !SetPieces[k,j].Equals(null) && k<15)
+                    {
+                        tempWord += SetPieces[k,j];
+                        k++;
+                    }
+                    if (tempWord.Length > 1)
+                    {
+                        AllWords.Add(tempWord);
+                    }
+                    tempWord="";
+                }
+            }
+        }
         for (int k = 0; k<15; k++)
         {
             for(int j = 0; j<15; j++)
             {
                 if(SetPieces[k,j] != null && !SetPieces[k,j].Equals(null))
                 {
-                    while(SetPieces[k,j] != null && !SetPieces[k,j].Equals(null))
+                    while(SetPieces[k,j] != null && !SetPieces[k,j].Equals(null) && j<15)
                     {
-                        // Debug.Log(k);
                         tempWord += SetPieces[k,j];
                         j++;
                     }
+                    if (tempWord.Length > 1)
+                    {
+                        AllWords.Add(tempWord);
+                    }
+                    tempWord="";
                 }
-                // if(SetPieces[k,j] == null){
-                    // AllWords.Add(tempWord);
-                // }
             }
         }
-        AllWords.Add(tempWord);
         foreach(string word in AllWords){
             Debug.Log(word);
+            Validate(word);
         }
-        Validate(tempWord);
+        // Validate(tempWord);
 
 
         
@@ -223,15 +277,21 @@ public class PlayGame : MonoBehaviour
                         yield return false;
                         break;
                     case UnityWebRequest.Result.Success:
-                        // Debug.Log(pages[page] + ":\nReceived: " + webRequest.downloadHandler.text);
-                        // Debug.Log(System.Type.GetType(webRequest.downloadHandler.text));
+                        //display shortened definition 
                         int beginningIndex = webRequest.downloadHandler.text.IndexOf("\"definition\"");
-                        // int beginningIndex = webRequest.downloadHandler.text.IndexOf("\"example\"");
-                        Debug.Log(webRequest.downloadHandler.text.Length);
-                        string shortened = webRequest.downloadHandler.text.Substring(beginningIndex, 125);
-                        // Debug.Log(shortened.GetType());
+                        string shortenedDef = webRequest.downloadHandler.text.Substring(beginningIndex, 160);
+                        var foundIndexes = new List<int>();
+                        for (int i = 0; i < shortenedDef.Length; i++)
+                        {
+                            if (shortenedDef[i] == '"')
+                            {
+                                foundIndexes.Add(i);
+                            }
+                        }
+                        string finalDef = webRequest.downloadHandler.text.Substring(beginningIndex, foundIndexes[4] -1);
                         wordPlayed.GetComponent<Text>().text = pages[page];
-                        wordDef.GetComponent<Text>().text = shortened;
+                        wordDef.GetComponent<Text>().text = finalDef;
+
                         isWord = true;
                         yield return true;
                         break;
@@ -241,13 +301,23 @@ public class PlayGame : MonoBehaviour
         }
         if(isWord){
 
-
             int played = 0;
             foreach(GameObject piece in PlayedPieces){
                 played++;
-                GameObject.Destroy(piece);
+                // GameObject.Destroy(piece);
             }
-            AddScore(TurnScore);
+
+            // if triple word is true turnscore * 3
+            if(isTripleWord)
+            {
+                AddScore(TurnScore * 3);
+            } else 
+            {
+                AddScore(TurnScore);
+            }
+
+            // Debug.Log(PlayedPiecePos.Count);
+            // AddScore(TurnScore);
             // scoreText.text = $"SCORE: {TurnScore}";
             scoreText.GetComponent<Text>().text = "SCORE:" + StartScore;
             TurnScore = 0;
@@ -255,12 +325,20 @@ public class PlayGame : MonoBehaviour
             gamePieces = GameObject.FindGameObjectsWithTag("Dragabble");
             playerHand = GameObject.FindGameObjectsWithTag("PlayerHand");
 
-            //loop through each player piece object and position a random gamepice over it
-            for (var i = 0; i < played; i++)
-            if(gamePieces[i] != null)
+            // Bool check to see if a collider gameObject is at position
+            bool isObjectHere(Vector3 position)
             {
-            gamePieces[Random.Range(0, gamePieces.Length)].transform.position = playerHand[i].transform.position;
-            
+                Collider[] intersecting = Physics.OverlapSphere(position, 0.01f);
+                return (intersecting.Length != 0);
+            }
+            //loop through each player piece object and position a random gamepiece over it
+            for (int i = 0; i < playerHand.Length; i++)
+            {
+                if(!isObjectHere(playerHand[i].transform.position))
+                {
+                    var randomInt = Random.Range(0, gamePieces.Length);
+                    gamePieces[randomInt].transform.position = playerHand[i].transform.position;
+                }
             }
             isWord = false;
         }

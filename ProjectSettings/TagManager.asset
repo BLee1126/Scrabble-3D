@@ -11,6 +11,9 @@ TagManager:
   - PlayerHand
   - SnappedTo
   - PieceCoaster
+  - TripleLetter
+  - TripleWord
+  - Unplayed
   layers:
   - Default
   - TransparentFX
